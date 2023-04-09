@@ -34,10 +34,22 @@ float noteToFreq(int note) {
     return (a / 32) * pow(2, ((note - 9) / 12.0));
 }
 
+void print_state() {
+	printf("");
+	for (uint8_t i = 0; i < 3; i++) {
+		if (channel_active[i]) {
+			printf("% 3u ", channel_note[i]);
+		} else {
+			printf("    ");
+		}
+	}
+	printf("\n");
+}
+
 void handle_midi_msg(struct midi_msg *msg) {
   switch(msg->type & 0xF0) {
   case MIDI_NOTE_ON:
-    printf("Note on #%d note=%d velocity=%d\n", msg->channel, msg->data[0], msg->data[1]);
+    //printf("Note on #%d note=%d velocity=%d\n", msg->channel, msg->data[0], msg->data[1]);
 	/*for (uint8_t i = 0; i < sizeof(channel_frequency); i++) {
 		if (channel_note[i] == 0) {
 			printf("Channel %u play %u\n", i, msg->data[0]);
@@ -53,9 +65,11 @@ void handle_midi_msg(struct midi_msg *msg) {
 		channel_note[msg->channel] = msg->data[0];
 		channel_active[msg->channel] = true;
 	}
+	
+	print_state();
     break;
   case MIDI_NOTE_OFF:
-    printf("Note off #%d note=%d velocity=%d\n", msg->channel, msg->data[0], msg->data[1]);
+    //printf("Note off #%d note=%d velocity=%d\n", msg->channel, msg->data[0], msg->data[1]);
 	/*for (uint8_t i = 0; i < sizeof(channel_frequency); i++) {
 		if (channel_note[i] == msg->data[0]) {
 			printf("Channel %u stop %u\n", i, msg->data[0]);
@@ -71,6 +85,7 @@ void handle_midi_msg(struct midi_msg *msg) {
 			channel_active[msg->channel] = false;
 		}
 	}
+	print_state();
     break;
   case MIDI_PROGRAM_CHANGE:
     printf("Program change #%d program=%d\n", msg->channel, msg->data[0]);
@@ -313,7 +328,7 @@ int main(int argc, char **argv) {
 	sidset(SID_PWLO1, pulsewidth & 0xFF);
 	sidset(SID_PWHI1, (pulsewidth >> 8) & 0x0F);
 	
-	sidset(SID_CR1, SID_TRI);// + SID_GATE);//SID_SAW + SID_GATE);
+	sidset(SID_CR1, SID_TRI);
 	
 	uint8_t attack = 8;
 	uint8_t decay = 8;
@@ -363,7 +378,7 @@ int main(int argc, char **argv) {
 		
 		sidset(SID_CR1, SID_PULSE + (channel_active[0] ? SID_GATE : 0));
 		sidset(SID_CR2, SID_SAW + (channel_active[1] ? SID_GATE : 0));
-		sidset(SID_CR3, SID_TRI + (channel_active[2] ? SID_GATE : 0));
+		sidset(SID_CR3, SID_SAW + (channel_active[2] ? SID_GATE : 0));
 
 		while (get_available_frames() < 4410 / 2) {
 			render_audio2(100);
