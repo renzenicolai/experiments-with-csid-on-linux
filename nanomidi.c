@@ -22,6 +22,7 @@ void midi_buffer_init(struct midi_buffer *buf)
 
 unsigned char previous_opcode = 0;
 unsigned char previous_readlen = 0;
+unsigned char previous_channel = 0;
 
 int midi_parse(struct midi_buffer *buf, unsigned char *bytes, int numbytes)
 {
@@ -42,6 +43,7 @@ int midi_parse(struct midi_buffer *buf, unsigned char *bytes, int numbytes)
         if((1 << buf->channel) & buf->channel_mask) {
           buf->opcode = c;
           previous_opcode = c;
+          previous_channel = buf->channel;
           buf->type = buf->opcode & 0xf0;
           buf->pos = 0;
 
@@ -60,6 +62,7 @@ int midi_parse(struct midi_buffer *buf, unsigned char *bytes, int numbytes)
         //printf("USE PREVIOUS\n");
         buf->opcode = previous_opcode;
         buf->readlen = previous_readlen;
+        buf->channel = previous_channel;
       }
       buf->data[buf->pos++] = c;
     }

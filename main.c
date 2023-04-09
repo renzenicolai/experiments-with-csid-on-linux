@@ -1,3 +1,4 @@
+#include <stdbool.h>
 #include <time.h>
 #include <math.h>
 #include <stdint.h>
@@ -26,6 +27,7 @@ void alsa_midi_init() {
 
 float channel_frequency[3] = {0};
 int channel_note[3] = {0};
+bool channel_active[3] = {false};
 
 float noteToFreq(int note) {
     float a = 440; //frequency of A (coomon value is 440Hz)
@@ -46,9 +48,10 @@ void handle_midi_msg(struct midi_msg *msg) {
 	}*/
 	
 	if (msg->channel < 3) {
-		printf("Channel %u play %u\n", msg->channel, msg->data[0]);
+		//printf("Channel %u play %u\n", msg->channel, msg->data[0]);
 		channel_frequency[msg->channel] = noteToFreq(msg->data[0]);
 		channel_note[msg->channel] = msg->data[0];
+		channel_active[msg->channel] = true;
 	}
     break;
   case MIDI_NOTE_OFF:
@@ -61,9 +64,12 @@ void handle_midi_msg(struct midi_msg *msg) {
 		}
 	}*/
 	if (msg->channel < 3) {
-		printf("Channel %u stop %u\n", msg->channel, msg->data[0]);
-		channel_frequency[msg->channel] = 0;
-		channel_note[msg->channel] = 0;
+		//printf("Channel %u stop %u\n", msg->channel, msg->data[0]);
+		//channel_frequency[msg->channel] = 0;
+		//channel_note[msg->channel] = 0;
+		if (channel_note[msg->channel] == msg->data[0]) {
+			channel_active[msg->channel] = false;
+		}
 	}
     break;
   case MIDI_PROGRAM_CHANGE:
@@ -88,10 +94,10 @@ void alsa_midi_receive() {
 		return;
 	}
 
-	for (int i = 0; i < read; i++) {
+	/*for (int i = 0; i < read; i++) {
 		printf("%02x ", buffer[i]);
 	}
-	printf("\n");
+	printf("\n");*/
 	
 	midi_parse(&midi_buffer, buffer, read);
 }
@@ -303,16 +309,16 @@ int main(int argc, char **argv) {
 	sidset(SID_FREQLO1, 0);
 	sidset(SID_FREQHI1, 0);
 	
-	uint16_t pulsewidth = 3070;
+	uint16_t pulsewidth = 2048;//3070;
 	sidset(SID_PWLO1, pulsewidth & 0xFF);
 	sidset(SID_PWHI1, (pulsewidth >> 8) & 0x0F);
 	
-	sidset(SID_CR1, SID_SAW + SID_GATE);
+	sidset(SID_CR1, SID_TRI);// + SID_GATE);//SID_SAW + SID_GATE);
 	
-	uint8_t attack = 0;
-	uint8_t decay = 0;
-	uint8_t sustain = 8;
-	uint8_t release = 12;
+	uint8_t attack = 8;
+	uint8_t decay = 8;
+	uint8_t sustain = 15;//8;
+	uint8_t release = 8;//12;
 	
 	sidset(SID_AD1, ((attack & 0xF) << 4) + (decay & 0xF));
 	sidset(SID_SR1, ((sustain & 0xF) << 4) + (release & 0xF));
@@ -331,10 +337,16 @@ int main(int argc, char **argv) {
 	
 	sidset(SID_RESFILT, 0);
 	
+	//sidset(SID_CR2, SID_TRI + SID_GATE);
+	//sidset(SID_CR3, SID_PULSE + SID_GATE);
+	
     
 	uint16_t FREQ_CONSTANT = pow(256, 3) / 985248;
 
 	printf("MAX: %u\n", max_frames);
+	
+	printf("\x1bc"); // Reset
+	printf("\x1b[0;37m"); // White
 	
     while (1) {
 		alsa_midi_receive();
@@ -348,6 +360,10 @@ int main(int argc, char **argv) {
 		uint16_t regvalue_channel3_frequency = FREQ_CONSTANT * channel_frequency[2];
 		sidset(14, regvalue_channel3_frequency & 0xFF);
 		sidset(15, regvalue_channel3_frequency >> 8);
+		
+		sidset(SID_CR1, SID_PULSE + (channel_active[0] ? SID_GATE : 0));
+		sidset(SID_CR2, SID_SAW + (channel_active[1] ? SID_GATE : 0));
+		sidset(SID_CR3, SID_TRI + (channel_active[2] ? SID_GATE : 0));
 
 		while (get_available_frames() < 4410 / 2) {
 			render_audio2(100);
